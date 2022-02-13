@@ -23,6 +23,8 @@ from deep_sort import preprocessing, nn_matching
 from deep_sort.detection import Detection
 from deep_sort.tracker import Tracker
 from tools import generate_detections as gdet
+
+import tensorflow.keras as keras
 flags.DEFINE_string('framework', 'tf', '(tf, tflite, trt')
 flags.DEFINE_string('weights', './checkpoints/yolov4-416',
                     'path to weights file')
@@ -70,8 +72,8 @@ def main(_argv):
         print(output_details)
     # otherwise load standard tensorflow saved model
     else:
-        saved_model_loaded = tf.saved_model.load(FLAGS.weights, tags=[tag_constants.SERVING])
-        infer = saved_model_loaded.signatures['serving_default']
+        #saved_model_loaded = tf.saved_model.load(FLAGS.weights, tags=[tag_constants.SERVING])
+        infer = keras.models.load_model(FLAGS.weights)
 
     # begin video capture
     try:
@@ -122,10 +124,17 @@ def main(_argv):
                                                 input_shape=tf.constant([input_size, input_size]))
         else:
             batch_data = tf.constant(image_data)
-            pred_bbox = infer(batch_data)
-            for key, value in pred_bbox.items():
-                boxes = value[:, :, 0:4]
-                pred_conf = value[:, :, 4:]
+            #pred_bbox = infer(batch_data)
+            #for key, value in pred_bbox.items():
+            #    boxes = value[:, :, 0:4]
+            #    pred_conf = value[:, :, 4:]
+
+            pred_bbox = infer.predict(batch_data)
+
+            for value in pred_bbox:
+                temp_value = np.expand_dims(value, axis=0)
+                boxes = temp_value[:, :, 0:4]
+                pred_conf = temp_value[:, :, 4:]
 
         boxes, scores, classes, valid_detections = tf.image.combined_non_max_suppression(
             boxes=tf.reshape(boxes, (tf.shape(boxes)[0], -1, 1, 4)),
@@ -152,13 +161,12 @@ def main(_argv):
 
         # store all predictions in one parameter for simplicity when calling functions
         pred_bbox = [bboxes, scores, classes, num_objects]
-
+        print(pred_bbox)
         # read in all class names from config
         class_names = utils.read_class_names(cfg.YOLO.CLASSES)
 
         # by default allow all classes in .names file
         allowed_classes = list(class_names.values())
-        
         # custom allowed classes (uncomment line below to customize tracker for only people)
         #allowed_classes = ['person']
 
@@ -213,6 +221,7 @@ def main(_argv):
             cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), color, 2)
             cv2.rectangle(frame, (int(bbox[0]), int(bbox[1]-30)), (int(bbox[0])+(len(class_name)+len(str(track.track_id)))*17, int(bbox[1])), color, -1)
             cv2.putText(frame, class_name + "-" + str(track.track_id),(int(bbox[0]), int(bbox[1]-10)),0, 0.75, (255,255,255),2)
+            print(bbox)
 
         # if enable info flag then print details about each track
             if FLAGS.info:
