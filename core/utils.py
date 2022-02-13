@@ -79,6 +79,13 @@ def read_class_names(class_file_name):
             names[ID] = name.strip('\n')
     return names
 
+def get_key(my_dict, val):
+    for key, value in my_dict.items():
+         if val == value:
+             return key
+ 
+    return "key doesn't exist"
+    
 def load_config(FLAGS):
     if FLAGS.tiny:
         STRIDES = np.array(cfg.YOLO.STRIDES_TINY)
